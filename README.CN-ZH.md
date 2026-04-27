@@ -13,6 +13,28 @@ English documentation: [README.md](README.md)
 - 主脚本不保存真实 token，方便开源。
 - 支持从任意本地 clone 路径运行。
 
+## 工作原理
+
+本项目只是一组 zsh 脚本。它不会修改 Claude Code，不会 patch 二进制文件，
+不会安装代理，也不会主动改变网络行为。
+
+当 shell 加载 `main.sh` 时，脚本会读取 provider 配置文件，并导出 Claude Code
+使用的环境变量，包括：
+
+```zsh
+ANTHROPIC_BASE_URL
+ANTHROPIC_AUTH_TOKEN
+ANTHROPIC_MODEL
+ANTHROPIC_DEFAULT_OPUS_MODEL
+ANTHROPIC_DEFAULT_SONNET_MODEL
+ANTHROPIC_DEFAULT_HAIKU_MODEL
+CLAUDE_CODE_SUBAGENT_MODEL
+CLAUDE_CODE_EFFORT_LEVEL
+```
+
+`cc-use <provider>` 只负责切换当前导出的 provider 配置，并把 provider 名称
+保存到 `state/current-provider`，让后续新开的 shell 继续使用同一配置。
+
 ## 安装
 
 先 clone 项目：
@@ -154,6 +176,30 @@ CLAUDE_CODE_EFFORT_LEVEL="max"
 ```
 
 至少需要填写 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`。
+
+## 卸载
+
+从 `~/.zshrc` 中删除 Claude Local Shell 配置块：
+
+```zsh
+# Claude Code Environment Variables
+if [[ -f "/Users/you/projects/claude-local-sh/main.sh" ]]; then
+  source "/Users/you/projects/claude-local-sh/main.sh"
+fi
+# End Claude Code Environment Variables
+```
+
+然后重新加载 shell：
+
+```zsh
+source ~/.zshrc
+```
+
+如果不再需要本地项目目录，也可以删除：
+
+```zsh
+rm -rf /Users/you/projects/claude-local-sh
+```
 
 ## 开源注意事项
 

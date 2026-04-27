@@ -13,6 +13,28 @@ Local zsh helpers for switching Claude Code compatible third-party providers.
 - Keep real tokens out of the main script.
 - Work from any local clone path.
 
+## How It Works
+
+This project is only a set of zsh scripts. It does not modify Claude Code,
+patch any binary, install a proxy, or change network behavior by itself.
+
+When your shell loads `main.sh`, it reads provider files and exports the
+environment variables used by Claude Code, including:
+
+```zsh
+ANTHROPIC_BASE_URL
+ANTHROPIC_AUTH_TOKEN
+ANTHROPIC_MODEL
+ANTHROPIC_DEFAULT_OPUS_MODEL
+ANTHROPIC_DEFAULT_SONNET_MODEL
+ANTHROPIC_DEFAULT_HAIKU_MODEL
+CLAUDE_CODE_SUBAGENT_MODEL
+CLAUDE_CODE_EFFORT_LEVEL
+```
+
+`cc-use <provider>` only changes which provider config is exported and saves
+that provider name in `state/current-provider` for future shells.
+
 ## Installation
 
 Clone this project first:
@@ -156,6 +178,30 @@ CLAUDE_CODE_EFFORT_LEVEL="max"
 ```
 
 At minimum, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`.
+
+## Uninstall
+
+Remove the Claude Local Shell block from `~/.zshrc`:
+
+```zsh
+# Claude Code Environment Variables
+if [[ -f "/Users/you/projects/claude-local-sh/main.sh" ]]; then
+  source "/Users/you/projects/claude-local-sh/main.sh"
+fi
+# End Claude Code Environment Variables
+```
+
+Then reload your shell:
+
+```zsh
+source ~/.zshrc
+```
+
+Optionally remove the local project directory:
+
+```zsh
+rm -rf /Users/you/projects/claude-local-sh
+```
 
 ## Git Safety
 
