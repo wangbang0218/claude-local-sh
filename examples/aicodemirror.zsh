@@ -1,0 +1,12 @@
+# shellcheck shell=zsh
+# Claude Code provider: aicodemirror
+
+ANTHROPIC_BASE_URL="https://api.aicodemirror.com/api/claudecode"
+ANTHROPIC_AUTH_TOKEN="your-apikey"
+ANTHROPIC_MODEL=""
+ANTHROPIC_DEFAULT_OPUS_MODEL=""
+ANTHROPIC_DEFAULT_SONNET_MODEL=""
+ANTHROPIC_DEFAULT_HAIKU_MODEL=""
+CLAUDE_CODE_SUBAGENT_MODEL=""
+CLAUDE_CODE_EFFORT_LEVEL=""
+
