@@ -1,0 +1,6 @@
+# Private provider configs and runtime state.
+providers/*
+!providers/.gitkeep
+
+state/*
+!state/.gitkeep

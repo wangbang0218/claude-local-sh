@@ -9,6 +9,8 @@ Local zsh helpers for switching Claude Code compatible third-party providers.
 - Load provider configs automatically from `providers/*.zsh`.
 - Use the provider config file name as the provider name.
 - Persist the selected provider across new shell sessions.
+- Restore Claude Code official OAuth/native subscription mode with `cc-reset`.
+- Sync provider switches to tmux global env when a tmux server is available.
 - Keep `ANTHROPIC_API_KEY` unset to avoid auth conflicts with `ANTHROPIC_AUTH_TOKEN`.
 - Keep real tokens out of the main script.
 - Work from any local clone path.
@@ -34,6 +36,17 @@ CLAUDE_CODE_EFFORT_LEVEL
 
 `cc-use <provider>` only changes which provider config is exported and saves
 that provider name in `state/current-provider` for future shells.
+
+If you use tmux, `cc-use <provider>` also syncs the selected provider into
+tmux global env when a tmux server is reachable. `cc-reset` clears the
+Claude Code environment variables managed by this project from the current
+shell and tmux global env, then writes `official` to `state/current-provider`.
+
+tmux global env mainly affects tmux panes, windows, or sessions created after
+the sync. tmux does not rewrite the environment of shell or service processes
+that are already running. Claude Code or other long-running services already
+started inside tmux must be restarted, or their pane/session recreated, before
+they use the new provider environment variables.
 
 ## Installation
 
@@ -130,7 +143,7 @@ claude-local-sh/
 
 - `main.sh`: entrypoint sourced by `~/.zshrc`.
 - `providers/*.zsh`: private provider config files loaded automatically.
-- `state/current-provider`: persisted selected provider.
+- `state/current-provider`: persisted selected provider; `official` means official mode.
 - `examples/*.zsh`: provider examples and templates, not loaded automatically.
 
 ## Commands
@@ -139,8 +152,22 @@ claude-local-sh/
 cc-list              # List available providers
 cc-current           # Show current provider and exported environment
 cc-use <provider>    # Switch provider permanently
+cc-reset             # Restore Claude Code official OAuth/native subscription mode
 cc-reload            # Reload provider config files
 ```
+
+## Restore Official Claude Mode
+
+To return to Claude Code official OAuth login or native subscription mode, run:
+
+```zsh
+cc-reset
+```
+
+This clears the Claude Code environment variables exported by this project from
+the current shell and persists the state as `official`, so new shells do not
+automatically restore a third-party provider. If a tmux server is available, it
+also clears the same variables from tmux global env.
 
 ## Add A Provider
 
@@ -180,6 +207,12 @@ CLAUDE_CODE_EFFORT_LEVEL="max"
 At minimum, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`.
 
 ## Uninstall
+
+First, restore official mode to clear the current shell and tmux global env:
+
+```zsh
+cc-reset
+```
 
 Remove the Claude Local Shell block from `~/.zshrc`:
 

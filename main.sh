@@ -5,16 +5,19 @@
 #   cc-list
 #   cc-current
 #   cc-use <provider>
+#   cc-reset
 #   cc-reload
 
 _CC_MAIN_FILE="${${(%):-%N}:A}"
 _CC_MAIN_DIR="${_CC_MAIN_FILE:h}"
+_CC_OFFICIAL_PROVIDER="official"
 
 export CLAUDE_LOCAL_SH_HOME="${CLAUDE_LOCAL_SH_HOME:-$_CC_MAIN_DIR}"
 export CLAUDE_CODE_PROVIDER_DIR="${CLAUDE_CODE_PROVIDER_DIR:-$CLAUDE_LOCAL_SH_HOME/providers}"
 export CLAUDE_CODE_STATE_DIR="${CLAUDE_CODE_STATE_DIR:-$CLAUDE_LOCAL_SH_HOME/state}"
 export CLAUDE_CODE_PROVIDER_FILE="${CLAUDE_CODE_PROVIDER_FILE:-$CLAUDE_CODE_STATE_DIR/current-provider}"
 
+typeset -ga _CC_MANAGED_ENV_NAMES
 typeset -ga _CC_PROVIDER_NAMES
 typeset -gA _CC_PROVIDER_BASE_URL
 typeset -gA _CC_PROVIDER_AUTH_TOKEN
@@ -24,6 +27,19 @@ typeset -gA _CC_PROVIDER_SONNET_MODEL
 typeset -gA _CC_PROVIDER_HAIKU_MODEL
 typeset -gA _CC_PROVIDER_SUBAGENT_MODEL
 typeset -gA _CC_PROVIDER_EFFORT_LEVEL
+
+_CC_MANAGED_ENV_NAMES=(
+  CLAUDE_CODE_PROVIDER
+  ANTHROPIC_BASE_URL
+  ANTHROPIC_AUTH_TOKEN
+  ANTHROPIC_API_KEY
+  ANTHROPIC_MODEL
+  ANTHROPIC_DEFAULT_OPUS_MODEL
+  ANTHROPIC_DEFAULT_SONNET_MODEL
+  ANTHROPIC_DEFAULT_HAIKU_MODEL
+  CLAUDE_CODE_SUBAGENT_MODEL
+  CLAUDE_CODE_EFFORT_LEVEL
+)
 
 function _cc_provider_exists() {
   local provider="$1"
@@ -126,8 +142,71 @@ function _cc_set_optional_env() {
   fi
 }
 
+function _cc_tmux_has_server() {
+  command -v tmux >/dev/null 2>&1 && tmux has-session >/dev/null 2>&1
+}
+
+function _cc_tmux_set_env() {
+  local name="$1"
+  local value="$2"
+
+  if ! _cc_tmux_has_server; then
+    return 0
+  fi
+
+  if [[ -n "$value" ]]; then
+    tmux set-environment -g "$name" "$value" >/dev/null 2>&1
+  else
+    tmux set-environment -g -u "$name" >/dev/null 2>&1
+  fi
+}
+
+function _cc_tmux_clear_managed_env() {
+  local name
+
+  if ! _cc_tmux_has_server; then
+    return 0
+  fi
+
+  for name in "${_CC_MANAGED_ENV_NAMES[@]}"; do
+    tmux set-environment -g -u "$name" >/dev/null 2>&1
+  done
+}
+
+function _cc_sync_provider_to_tmux() {
+  local provider="$1"
+
+  _cc_tmux_set_env CLAUDE_LOCAL_SH_HOME "$CLAUDE_LOCAL_SH_HOME"
+  _cc_tmux_set_env CLAUDE_CODE_PROVIDER_DIR "$CLAUDE_CODE_PROVIDER_DIR"
+  _cc_tmux_set_env CLAUDE_CODE_STATE_DIR "$CLAUDE_CODE_STATE_DIR"
+  _cc_tmux_set_env CLAUDE_CODE_PROVIDER_FILE "$CLAUDE_CODE_PROVIDER_FILE"
+  _cc_tmux_set_env CLAUDE_CODE_PROVIDER "$provider"
+  _cc_tmux_set_env ANTHROPIC_BASE_URL "${_CC_PROVIDER_BASE_URL[$provider]}"
+  _cc_tmux_set_env ANTHROPIC_AUTH_TOKEN "${_CC_PROVIDER_AUTH_TOKEN[$provider]}"
+  _cc_tmux_set_env ANTHROPIC_API_KEY ""
+  _cc_tmux_set_env ANTHROPIC_MODEL "${_CC_PROVIDER_MODEL[$provider]}"
+  _cc_tmux_set_env ANTHROPIC_DEFAULT_OPUS_MODEL "${_CC_PROVIDER_OPUS_MODEL[$provider]}"
+  _cc_tmux_set_env ANTHROPIC_DEFAULT_SONNET_MODEL "${_CC_PROVIDER_SONNET_MODEL[$provider]}"
+  _cc_tmux_set_env ANTHROPIC_DEFAULT_HAIKU_MODEL "${_CC_PROVIDER_HAIKU_MODEL[$provider]}"
+  _cc_tmux_set_env CLAUDE_CODE_SUBAGENT_MODEL "${_CC_PROVIDER_SUBAGENT_MODEL[$provider]}"
+  _cc_tmux_set_env CLAUDE_CODE_EFFORT_LEVEL "${_CC_PROVIDER_EFFORT_LEVEL[$provider]}"
+}
+
+function _cc_clear_managed_env() {
+  local name
+
+  for name in "${_CC_MANAGED_ENV_NAMES[@]}"; do
+    unset "$name"
+  done
+}
+
 function _cc_export_provider() {
   local provider="$1"
+
+  if [[ "$provider" == "$_CC_OFFICIAL_PROVIDER" ]]; then
+    echo "Use cc-reset to restore Claude Code official OAuth/native subscription mode." >&2
+    return 1
+  fi
 
   if ! _cc_provider_exists "$provider"; then
     echo "Unknown Claude Code provider: $provider" >&2
@@ -152,6 +231,7 @@ function _cc_export_provider() {
   _cc_set_optional_env ANTHROPIC_DEFAULT_HAIKU_MODEL "${_CC_PROVIDER_HAIKU_MODEL[$provider]}"
   _cc_set_optional_env CLAUDE_CODE_SUBAGENT_MODEL "${_CC_PROVIDER_SUBAGENT_MODEL[$provider]}"
   _cc_set_optional_env CLAUDE_CODE_EFFORT_LEVEL "${_CC_PROVIDER_EFFORT_LEVEL[$provider]}"
+  _cc_sync_provider_to_tmux "$provider"
 }
 
 function cc-use() {
@@ -172,8 +252,24 @@ function cc-use() {
   echo "Claude Code provider switched to: $provider"
 }
 
+function cc-reset() {
+  _cc_clear_managed_env
+  _cc_tmux_clear_managed_env
+
+  mkdir -p "$CLAUDE_CODE_STATE_DIR"
+  printf "%s\n" "$_CC_OFFICIAL_PROVIDER" > "$CLAUDE_CODE_PROVIDER_FILE"
+  echo "Claude Code provider reset to official OAuth/native subscription mode."
+}
+
 function cc-current() {
-  echo "CLAUDE_CODE_PROVIDER=${CLAUDE_CODE_PROVIDER:-unknown}"
+  local state_provider="$(cat "$CLAUDE_CODE_PROVIDER_FILE" 2>/dev/null)"
+  local current_provider="${CLAUDE_CODE_PROVIDER:-unknown}"
+
+  if [[ "$state_provider" == "$_CC_OFFICIAL_PROVIDER" && -z "$CLAUDE_CODE_PROVIDER" ]]; then
+    current_provider="official"
+  fi
+
+  echo "CLAUDE_CODE_PROVIDER=$current_provider"
   echo "ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-unset}"
   echo "ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-unset}"
   echo "ANTHROPIC_DEFAULT_OPUS_MODEL=${ANTHROPIC_DEFAULT_OPUS_MODEL:-unset}"
@@ -204,6 +300,8 @@ function cc-reload() {
 
   if [[ -n "$provider" ]]; then
     _cc_export_provider "$provider" >/dev/null
+  elif [[ "$(cat "$CLAUDE_CODE_PROVIDER_FILE" 2>/dev/null)" == "$_CC_OFFICIAL_PROVIDER" ]]; then
+    _cc_clear_managed_env
   fi
 }
 
@@ -211,7 +309,9 @@ _cc_load_providers
 _cc_selected_provider="$(cat "$CLAUDE_CODE_PROVIDER_FILE" 2>/dev/null)"
 _cc_selected_provider="${_cc_selected_provider:-${_CC_PROVIDER_NAMES[1]}}"
 
-if [[ -n "$_cc_selected_provider" ]]; then
+if [[ "$_cc_selected_provider" == "$_CC_OFFICIAL_PROVIDER" ]]; then
+  _cc_clear_managed_env
+elif [[ -n "$_cc_selected_provider" ]]; then
   _cc_export_provider "$_cc_selected_provider" >/dev/null
 fi
 

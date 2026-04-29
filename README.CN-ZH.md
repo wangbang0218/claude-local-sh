@@ -9,6 +9,8 @@ English documentation: [README.md](README.md)
 - 自动加载 `providers/*.zsh` 下的服务配置。
 - 直接使用配置文件名作为服务名。
 - `cc-use` 切换后会持久保存，新开的终端继续生效。
+- `cc-reset` 可快速恢复 Claude Code 官方 OAuth/原生订阅模式。
+- 有可用 tmux server 时，切换 provider 会同步到 tmux global env。
 - 主动清理 `ANTHROPIC_API_KEY`，只使用 `ANTHROPIC_AUTH_TOKEN`，避免认证冲突。
 - 主脚本不保存真实 token，方便开源。
 - 支持从任意本地 clone 路径运行。
@@ -34,6 +36,15 @@ CLAUDE_CODE_EFFORT_LEVEL
 
 `cc-use <provider>` 只负责切换当前导出的 provider 配置，并把 provider 名称
 保存到 `state/current-provider`，让后续新开的 shell 继续使用同一配置。
+
+如果使用 tmux，`cc-use <provider>` 会在可连接 tmux server 时同步写入 tmux
+global env。`cc-reset` 会清理当前 shell 和 tmux global env 中本项目管理的
+Claude Code 环境变量，并把 `state/current-provider` 写为 `official`。
+
+tmux global env 主要影响之后新开的 tmux pane、window 或 session；已经运行中
+的 shell 进程和服务进程环境不会被 tmux 反向修改。已经在 tmux 中启动的
+Claude Code 或其他长期运行服务，需要重启对应服务、pane 或 session 后才会
+使用新的 provider 环境变量。
 
 ## 安装
 
@@ -129,7 +140,7 @@ claude-local-sh/
 
 - `main.sh`：由 `~/.zshrc` 引用的主入口。
 - `providers/*.zsh`：私有服务配置文件，会被自动加载。
-- `state/current-provider`：持久保存当前选中的服务。
+- `state/current-provider`：持久保存当前选中的服务；`official` 表示官方模式。
 - `examples/*.zsh`：服务示例和模板，不会自动加载。
 
 ## 常用命令
@@ -138,8 +149,21 @@ claude-local-sh/
 cc-list              # 查看可用服务
 cc-current           # 查看当前服务和已导出的环境变量
 cc-use <provider>    # 永久切换服务
+cc-reset             # 恢复 Claude Code 官方 OAuth/原生订阅模式
 cc-reload            # 重新加载服务配置
 ```
+
+## 恢复官方 Claude 模式
+
+如果想回到 Claude Code 官方 OAuth 登录或原生订阅模式，执行：
+
+```zsh
+cc-reset
+```
+
+这会清理当前 shell 中本项目导出的 Claude Code 环境变量，并把状态持久保存为
+`official`，新开的 shell 不会再自动恢复第三方 provider。如果当前有可用
+tmux server，也会同步清理 tmux global env。
 
 ## 新增服务
 
@@ -178,6 +202,12 @@ CLAUDE_CODE_EFFORT_LEVEL="max"
 至少需要填写 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`。
 
 ## 卸载
+
+建议先恢复官方模式，顺便清理当前 shell 和 tmux global env：
+
+```zsh
+cc-reset
+```
 
 从 `~/.zshrc` 中删除 Claude Local Shell 配置块：
 
